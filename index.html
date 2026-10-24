@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#07070c">
+  <meta name="description" content="Quake 3 Arena 3D — a fast, brutal browser arena shooter built with Three.js.">
+  <title>QUAKE 3 ARENA 3D</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./css/style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="game" aria-label="Arena game view"></canvas>
+
+    <div class="screen-fx" aria-hidden="true">
+      <div class="screen-fx__vignette"></div>
+      <div class="screen-fx__scanlines"></div>
+      <div class="screen-fx__noise"></div>
+      <div id="damage-flash" class="screen-fx__damage"></div>
+      <div id="pickup-flash" class="screen-fx__pickup"></div>
+    </div>
+
+    <div id="hud" class="hud is-hidden" aria-live="polite">
+      <header class="hud-top">
+        <div class="hud-top__left">
+          <span class="hud-label">MODE</span>
+          <strong>DEATHMATCH</strong>
+          <span class="hud-sep">//</span>
+          <span class="hud-muted">15 FRAGS</span>
+        </div>
+        <div class="hud-top__center">
+          <span class="hud-clock__label">TIME REMAINING</span>
+          <strong id="match-clock" class="hud-clock">05:00</strong>
+        </div>
+        <div class="hud-top__right">
+          <span class="hud-label">LEADER</span>
+          <strong id="leader-name">—</strong>
+          <span id="leader-score" class="leader-score">0</span>
+        </div>
+      </header>
+
+      <section class="hud-vitals" aria-label="Player status">
+        <div class="portrait-frame">
+          <div class="portrait-frame__inner">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <path d="M50 8 86 27v37L50 92 14 64V27Z" fill="none" stroke="currentColor" stroke-width="2" opacity=".45"/>
+              <path d="M50 21 74 34v26L50 78 26 60V34Z" fill="none" stroke="currentColor" stroke-width="1" opacity=".35"/>
+              <path d="M36 43 50 31l14 12-5 21-9 9-9-9Z" fill="currentColor" opacity=".82"/>
+              <path d="M42 45h16l-2 7-6 4-6-4Z" fill="#09080b"/>
+            </svg>
+          </div>
+          <div class="portrait-frame__level">09</div>
+        </div>
+        <div class="vitals-stack">
+          <div class="vitals-name"><span class="status-dot"></span> RANGER-01 <span class="vitals-tag">YOU</span></div>
+          <div class="vitals-row">
+            <div class="vital vital--health">
+              <span class="vital__icon" aria-hidden="true">+</span>
+              <div>
+                <span class="vital__label">HEALTH</span>
+                <strong id="health-value">100</strong>
+              </div>
+            </div>
+            <div class="vital vital--armor">
+              <span class="vital__icon" aria-hidden="true">◇</span>
+              <div>
+                <span class="vital__label">ARMOR</span>
+                <strong id="armor-value">50</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="hud-ammo" aria-label="Weapon status">
+        <div class="weapon-readout">
+          <span id="weapon-slot" class="weapon-slot">03</span>
+          <div>
+            <span id="weapon-class" class="weapon-class">HEAVY ORDNANCE</span>
+            <strong id="weapon-name">ROCKET LAUNCHER</strong>
+          </div>
+        </div>
+        <div class="ammo-readout">
+          <strong id="ammo-value">12</strong>
+          <span id="ammo-max">/ 24</span>
+        </div>
+        <div class="weapon-slots" aria-hidden="true">
+          <span data-slot="1">1</span><span data-slot="2">2</span><span data-slot="3" class="active">3</span><span data-slot="4">4</span>
+        </div>
+      </section>
+
+      <section class="hud-radar" aria-label="Arena radar">
+        <canvas id="radar" width="180" height="180"></canvas>
+        <div class="radar-ring"></div>
+        <span class="radar-label">TACTICAL</span>
+      </section>
+
+      <div class="hud-frags">
+        <span class="hud-label">YOUR FRAGS</span>
+        <strong id="frag-count">0</strong>
+        <span class="hud-muted">/ 15</span>
+      </div>
+
+      <div id="killfeed" class="killfeed" aria-live="polite"></div>
+
+      <div id="crosshair" class="crosshair" aria-hidden="true">
+        <span class="crosshair__dot"></span>
+        <span class="crosshair__line crosshair__line--t"></span>
+        <span class="crosshair__line crosshair__line--r"></span>
+        <span class="crosshair__line crosshair__line--b"></span>
+        <span class="crosshair__line crosshair__line--l"></span>
+        <span class="crosshair__hit crosshair__hit--l"></span>
+        <span class="crosshair__hit crosshair__hit--r"></span>
+        <span class="crosshair__hit crosshair__hit--t"></span>
+        <span class="crosshair__hit crosshair__hit--b"></span>
+      </div>
+
+      <div id="hitmarker" class="hitmarker" aria-hidden="true">
+        <i></i><i></i><i></i><i></i>
+      </div>
+
+      <div id="center-message" class="center-message">
+        <span id="center-kicker">ELIMINATED</span>
+        <strong id="center-text">VEX</strong>
+        <small id="center-sub">+1 FRAG</small>
+      </div>
+
+      <div id="respawn-timer" class="respawn-timer is-hidden">
+        <span>REDEPLOYING IN</span>
+        <strong id="respawn-count">3</strong>
+      </div>
+
+      <div id="scoreboard" class="scoreboard is-hidden">
+        <div class="scoreboard__head">
+          <span>DEATHMATCH</span>
+          <strong>ORBITAL RELIQUARY</strong>
+          <span>15 FRAG LIMIT</span>
+        </div>
+        <div class="scoreboard__cols"><span>RANK</span><span>COMBATANT</span><span>FRAGS</span><span>DEATHS</span><span>ACCURACY</span></div>
+        <ol id="scoreboard-list" class="scoreboard__list"></ol>
+        <div class="scoreboard__foot">TAB TO CLOSE &nbsp;•&nbsp; FRAG LIMIT 15 &nbsp;•&nbsp; 5:00</div>
+      </div>
+
+      <div id="scope" class="scope is-hidden" aria-hidden="true">
+        <div class="scope__lens"><span></span><i></i><b></b></div>
+        <small>RAILGUN // 4.2x OPTIC</small>
+      </div>
+
+      <div id="hit-direction" class="hit-direction" aria-hidden="true"></div>
+      <div id="low-health" class="low-health" aria-hidden="true"></div>
+    </div>
+
+    <div id="menu" class="menu">
+      <div class="menu__grid" aria-hidden="true"></div>
+      <div class="menu__topbar">
+        <div class="brand-mark">
+          <span class="brand-mark__diamond"></span>
+          <span>ID SOFTWARE PRESENTS</span>
+          <span class="brand-mark__line"></span>
+          <span class="brand-mark__build">BUILD 3.0 // WEBGL</span>
+        </div>
+        <div class="menu__topmeta">
+          <span class="live-pip"></span> ARENA SERVER ONLINE
+        </div>
+      </div>
+
+      <div class="menu__content">
+        <div class="menu__hero">
+          <div class="eyebrow"><span></span> ORBITAL BLOODSPORT / SECTOR 09</div>
+          <h1 class="logo" aria-label="Quake 3 Arena 3D">
+            <span class="logo__quake" data-text="QUAKE">QUAKE</span>
+            <span class="logo__three">3</span>
+            <span class="logo__arena">ARENA <em>3D</em></span>
+          </h1>
+          <p class="tagline">NO MERCY. NO HORIZON. <strong>ONLY FRAGS.</strong></p>
+          <p class="menu__blurb">The legendary arena shooter, rebuilt in your browser. Rocket-jump the reliquary, hunt three lethal combatants, and climb the board before the clock burns out.</p>
+
+          <div class="menu__actions">
+            <button id="play-button" class="play-button" type="button" aria-label="Play">
+              <span class="play-button__glow"></span>
+              <span class="play-button__icon">▶</span>
+              <span class="play-button__copy"><strong>PLAY</strong><small>ENTER THE ARENA</small></span>
+              <span class="play-button__chev">»</span>
+            </button>
+            <button id="how-button" class="ghost-button" type="button">HOW TO PLAY</button>
+          </div>
+
+          <div class="menu__stats">
+            <div><strong>3</strong><span>HUNTERS</span></div>
+            <div><strong>4</strong><span>WEAPONS</span></div>
+            <div><strong>15</strong><span>FRAG LIMIT</span></div>
+            <div><strong>∞</strong><span>VIOLENCE</span></div>
+          </div>
+        </div>
+
+        <aside class="menu__side">
+          <div class="side-panel">
+            <span class="side-panel__num">01</span>
+            <div>
+              <h2>THE RELIQUARY</h2>
+              <p>A forsaken gothic arena adrift above a dying world. Sightlines are long. Cover is scarce. Movement is life.</p>
+            </div>
+          </div>
+          <div class="side-panel">
+            <span class="side-panel__num">02</span>
+            <div>
+              <h2>LOADOUT</h2>
+              <ul class="loadout-list">
+                <li><b>01</b> PULSE RIFLE <span>INF</span></li>
+                <li><b>02</b> SCATTERGUN <span>24</span></li>
+                <li><b>03</b> ROCKET LAUNCHER <span>12</span></li>
+                <li><b>04</b> RAILGUN <span>06</span></li>
+              </ul>
+            </div>
+          </div>
+          <div class="side-panel">
+            <span class="side-panel__num">03</span>
+            <div>
+              <h2>TOP FRAGGER</h2>
+              <div class="top-fragger">
+                <span class="top-fragger__rank">#1</span>
+                <div><strong>VEX</strong><small>12 FRAGS / 0 DEATHS</small></div>
+                <span class="top-fragger__kdr">∞</span>
+              </div>
+            </div>
+          </div>
+          <div class="system-status">
+            <span><i></i> POINTER LOCK</span>
+            <span><i></i> AUDIO READY</span>
+            <span><i></i> 60 FPS TARGET</span>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="menu__footer">
+        <div class="control-strip">
+          <span><kbd>WASD</kbd> MOVE</span>
+          <span><kbd>SPACE</kbd> JUMP</span>
+          <span><kbd>LMB</kbd> FIRE</span>
+          <span><kbd>RMB</kbd> ZOOM</span>
+          <span><kbd>1—4</kbd> WEAPONS</span>
+          <span><kbd>ESC</kbd> PAUSE</span>
+        </div>
+        <div class="footer-note">BEST EXPERIENCED WITH HEADPHONES <span>•</span> DESKTOP // 1440P READY</div>
+      </footer>
+
+      <div id="how-panel" class="how-panel is-hidden">
+        <button id="how-close" type="button" aria-label="Close how to play">×</button>
+        <span class="eyebrow"><span></span> FIELD MANUAL</span>
+        <h2>STAY MOVING. SHOOT FIRST.</h2>
+        <div class="how-grid">
+          <div><span>01</span><h3>MOVE</h3><p><kbd>WASD</kbd> to strafe and circle-strafe. <kbd>SPACE</kbd> jumps. Momentum is everything.</p></div>
+          <div><span>02</span><h3>FRAG</h3><p><kbd>LMB</kbd> fires. Click a weapon slot with <kbd>1—4</kbd> or the mouse wheel. Rockets reward prediction.</p></div>
+          <div><span>03</span><h3>SURVIVE</h3><p>Grab <b class="c-health">HEALTH</b> and <b class="c-armor">ARMOR</b> pickups. First to <b class="c-frag">15 FRAGS</b> wins.</p></div>
+          <div><span>04</span><h3>ZOOM</h3><p><kbd>RMB</kbd> steadies the railgun and pulse rifle. Headshots deal double damage.</p></div>
+          <div><span>05</span><h3>PAUSE</h3><p><kbd>ESC</kbd> releases the mouse and opens the tactical pause menu. <kbd>TAB</kbd> shows the scoreboard.</p></div>
+          <div><span>06</span><h3>RADAR</h3><p>The lower-left radar pings hostile combatants. Red blips are close. Keep your back to the void.</p></div>
+        </div>
+        <button id="how-dismiss" class="ghost-button" type="button">RETURN TO ARENA</button>
+      </div>
+    </div>
+
+    <div id="pause-menu" class="overlay-panel is-hidden">
+      <div class="pause-card">
+        <span class="eyebrow"><span></span> COMBAT SUSPENDED</span>
+        <h2>TACTICAL PAUSE</h2>
+        <p>The arena waits. Your enemies do not.</p>
+        <button id="resume-button" class="play-button play-button--small" type="button" aria-label="Resume">
+          <span class="play-button__icon">▶</span>
+          <span class="play-button__copy"><strong>RESUME</strong><small>BACK TO THE FIGHT</small></span>
+        </button>
+        <button id="restart-button" class="ghost-button" type="button">RESTART MATCH</button>
+        <button id="quit-button" class="ghost-button" type="button">QUIT TO MENU</button>
+        <div class="pause-controls"><kbd>WASD</kbd> MOVE <kbd>SPACE</kbd> JUMP <kbd>1—4</kbd> WEAPONS <kbd>TAB</kbd> SCORES</div>
+      </div>
+    </div>
+
+    <div id="gameover" class="overlay-panel is-hidden">
+      <div class="result-card">
+        <span id="result-kicker" class="eyebrow"><span></span> MATCH COMPLETE</span>
+        <h2 id="result-title">VICTORY</h2>
+        <p id="result-sub">The reliquary belongs to you.</p>
+        <div class="result-stats">
+          <div><span>FRAGS</span><strong id="result-frags">15</strong></div>
+          <div><span>DEATHS</span><strong id="result-deaths">4</strong></div>
+          <div><span>ACCURACY</span><strong id="result-accuracy">48%</strong></div>
+          <div><span>PLACE</span><strong id="result-place">1ST</strong></div>
+        </div>
+        <button id="again-button" class="play-button play-button--small" type="button" aria-label="Play again">
+          <span class="play-button__icon">▶</span>
+          <span class="play-button__copy"><strong>PLAY AGAIN</strong><small>RESET THE ARENA</small></span>
+        </button>
+        <button id="menu-button" class="ghost-button" type="button">RETURN TO MENU</button>
+      </div>
+    </div>
+
+    <div id="rotate-device" class="rotate-device is-hidden">
+      <span>↻</span>
+      <strong>ROTATE TO LANDSCAPE</strong>
+      <p>For the full arena experience.</p>
+    </div>
+
+    <div id="touch-ui" class="touch-ui is-hidden" aria-hidden="true">
+      <div id="touch-stick" class="touch-stick"><span></span></div>
+      <button id="touch-jump" class="touch-action touch-action--jump" type="button">JUMP</button>
+      <button id="touch-fire" class="touch-action touch-action--fire" type="button">FIRE</button>
+      <button id="touch-swap" class="touch-action touch-action--swap" type="button">SWAP</button>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="loading__sigil"></div>
+      <span>FORGING THE RELIQUARY</span>
+      <div class="loading__bar"><i></i></div>
+    </div>
+
+    <div id="unsupported" class="unsupported is-hidden">
+      <h2>WEBGL 2 REQUIRED</h2>
+      <p>This arena needs hardware-accelerated WebGL 2. Try a recent desktop Chrome, Edge, or Firefox.</p>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
